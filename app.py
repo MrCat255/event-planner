@@ -217,3 +217,120 @@ with app.app_context():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+@app.route('/api/participants', methods=['GET'])
+@jwt_required()
+def get_participants():
+    try:
+        current_user_id = int(get_jwt_identity())
+        participants = Participant.query.filter_by(user_id=current_user_id).all()
+        
+        return jsonify({
+            'participants': [participant.to_dict() for participant in participants]
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/participants', methods=['POST'])
+@jwt_required()
+def create_participant():
+    try:
+        current_user_id = int(get_jwt_identity())
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        event_id = data.get('event_id')
+        
+        if not event_id:
+            return jsonify({'error': 'event_id is required'}), 400
+        
+        # Check if event exists and belongs to another user (participant can join any event)
+        event = Event.query.filter_by(id=event_id).first()
+        if not event:
+            return jsonify({'error': 'Event not found'}), 404
+        
+        # Check if participant already exists
+        if Participant.query.filter_by(user_id=current_user_id, event_id=event_id).first():
+            return jsonify({'error': 'User is already a participant of this event'}), 409
+        
+        # Create participant
+        new_participant = Participant(
+            user_id=current_user_id,
+            event_id=event_id
+        )
+        
+        db.session.add(new_participant)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Participant added successfully',
+            'participant': new_participant.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/participants/<int:participant_id>', methods=['PUT'])
+@jwt_required()
+def update_participant(participant_id):
+    try:
+        current_user_id = int(get_jwt_identity())
+        participant = Participant.query.filter_by(id=participant_id, user_id=current_user_id).first()
+        
+        if not participant:
+            return jsonify({'error': 'Participant not found'}), 404
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Update event_id if provided
+        if 'event_id' in data:
+            event_id = data['event_id']
+            # Check if event exists
+            event = Event.query.filter_by(id=event_id).first()
+            if not event:
+                return jsonify({'error': 'Event not found'}), 404
+            
+            # Check if participant already exists for this event
+            existing = Participant.query.filter_by(user_id=current_user_id, event_id=event_id).first()
+            if existing and existing.id != participant_id:
+                return jsonify({'error': 'User is already a participant of this event'}), 409
+            
+            participant.event_id = event_id
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Participant updated successfully',
+            'participant': participant.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/participants/<int:participant_id>', methods=['DELETE'])
+@jwt_required()
+def delete_participant(participant_id):
+    try:
+        current_user_id = int(get_jwt_identity())
+        participant = Participant.query.filter_by(id=participant_id, user_id=current_user_id).first()
+        
+        if not participant:
+            return jsonify({'error': 'Participant not found'}), 404
+        
+        db.session.delete(participant)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Participant removed successfully'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
