@@ -106,3 +106,116 @@ with app.app_context():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+@app.route('/api/events', methods=['GET'])
+@jwt_required()
+def get_events():
+    try:
+        current_user_id = get_jwt_identity()
+        events = Event.query.filter_by(user_id=current_user_id).all()
+        
+        return jsonify({
+            'events': [event.to_dict() for event in events]
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/events', methods=['POST'])
+@jwt_required()
+def create_event():
+    try:
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        title = data.get('title')
+        date_str = data.get('date')
+        
+        if not title or not date_str:
+            return jsonify({'error': 'Title and date are required'}), 400
+        
+        # Parse date
+        try:
+            from datetime import datetime
+            date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        except ValueError:
+            return jsonify({'error': 'Invalid date format. Use ISO format (e.g., 2024-12-31T10:00:00)'}), 400
+        
+        # Create event
+        new_event = Event(
+            title=title,
+            date=date,
+            user_id=current_user_id
+        )
+        
+        db.session.add(new_event)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Event created successfully',
+            'event': new_event.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/events/<int:event_id>', methods=['PUT'])
+@jwt_required()
+def update_event(event_id):
+    try:
+        current_user_id = get_jwt_identity()
+        event = Event.query.filter_by(id=event_id, user_id=current_user_id).first()
+        
+        if not event:
+            return jsonify({'error': 'Event not found'}), 404
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Update fields
+        if 'title' in data:
+            event.title = data['title']
+        
+        if 'date' in data:
+            try:
+                from datetime import datetime
+                event.date = datetime.fromisoformat(data['date'].replace('Z', '+00:00'))
+            except ValueError:
+                return jsonify({'error': 'Invalid date format. Use ISO format (e.g., 2024-12-31T10:00:00)'}), 400
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Event updated successfully',
+            'event': event.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/events/<int:event_id>', methods=['DELETE'])
+@jwt_required()
+def delete_event(event_id):
+    try:
+        current_user_id = get_jwt_identity()
+        event = Event.query.filter_by(id=event_id, user_id=current_user_id).first()
+        
+        if not event:
+            return jsonify({'error': 'Event not found'}), 404
+        
+        db.session.delete(event)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Event deleted successfully'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
