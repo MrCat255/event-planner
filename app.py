@@ -1,6 +1,6 @@
 import os
 import re
-from datetime import timedelta
+from datetime import timedelta, datetime
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from models import db, User, Event, Participant
@@ -100,13 +100,6 @@ def login():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Initialize database tables
-with app.app_context():
-    db.create_all()
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-
 @app.route('/api/events', methods=['GET'])
 @jwt_required()
 def get_events():
@@ -139,7 +132,6 @@ def create_event():
         
         # Parse date
         try:
-            from datetime import datetime
             date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
         except ValueError:
             return jsonify({'error': 'Invalid date format. Use ISO format (e.g., 2024-12-31T10:00:00)'}), 400
@@ -183,7 +175,6 @@ def update_event(event_id):
         
         if 'date' in data:
             try:
-                from datetime import datetime
                 event.date = datetime.fromisoformat(data['date'].replace('Z', '+00:00'))
             except ValueError:
                 return jsonify({'error': 'Invalid date format. Use ISO format (e.g., 2024-12-31T10:00:00)'}), 400
@@ -219,3 +210,10 @@ def delete_event(event_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+# Initialize database tables
+with app.app_context():
+    db.create_all()
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
