@@ -89,7 +89,7 @@ def login():
             return jsonify({'error': 'Invalid email or password'}), 401
         
         # Create access token
-        access_token = create_access_token(identity=user.id)
+        access_token = create_access_token(identity=str(user.id))
         
         return jsonify({
             'message': 'Login successful',
@@ -104,7 +104,7 @@ def login():
 @jwt_required()
 def get_events():
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         events = Event.query.filter_by(user_id=current_user_id).all()
         
         return jsonify({
@@ -118,7 +118,7 @@ def get_events():
 @jwt_required()
 def create_event():
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
         
         if not data:
@@ -159,7 +159,7 @@ def create_event():
 @jwt_required()
 def update_event(event_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         event = Event.query.filter_by(id=event_id, user_id=current_user_id).first()
         
         if not event:
@@ -194,7 +194,7 @@ def update_event(event_id):
 @jwt_required()
 def delete_event(event_id):
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         event = Event.query.filter_by(id=event_id, user_id=current_user_id).first()
         
         if not event:
